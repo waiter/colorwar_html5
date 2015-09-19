@@ -1,0 +1,724 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <meta name="viewport"
+          content="width=device-width,initial-scale=1.0,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no">
+    <link rel="shortcut icon" type="image/x-icon" href="images/iconB1.ico" media="screen"/>
+    <script type="text/javascript" src="js/lufylegend-1.9.7.min.js"></script>
+    <title>颜色战争</title>
+</head>
+<body style="margin:0px 0px 0px 0px;">
+<div id="mylegend">载入中....</div>
+<script>
+
+var width = 640;
+var height = 960;
+var frameRate = 60;
+var cr = 100;
+var loadData = [
+    {name: "game_title", path: "images/game_title.png", type: "bitmapData"},
+    {name: "start", path: "images/start.png", type: "bitmapData"},
+    {name: "bestscore", path: "images/bestscore.png", type: "bitmapData"},
+    {name: "circle", path: "images/circle.png", type: "bitmapData"},
+    {name: "points", path: "images/points.png", type: "bitmapData"},
+    {name: "restart", path: "images/restart.png", type: "bitmapData"},
+    {name: "share", path: "images/share.png", type: "bitmapData"},
+    {name: "timebar", path: "images/timebar.png", type: "bitmapData"},
+    {name: "timebarbg", path: "images/timebarbg.png", type: "bitmapData"}
+];
+
+if (true || LGlobal.canTouch) {
+    LGlobal.stageScale = LStageScaleMode.SHOW_ALL;
+    LSystem.screen(LStage.FULL_SCREEN);
+}
+var loader;
+var datalist = {};
+init(1000 / frameRate, "mylegend", width, height, main);
+var imageDatas = [];
+var utils = new Utils();
+var constant = new Constant();
+var layer;
+var mainScene;
+var gameScene;
+function main() {
+    var loadsample = new LoadingSample5(height, "#ffffff", "#000000");
+    addChild(loadsample);
+    LLoadManage.load(
+            loadData,
+            function (progress) {
+                loadsample.setProgress(progress);
+            },
+            function (result) {
+                LGlobal.setDebug(true);
+                datalist = result;
+                removeChild(loadsample);
+                loadsample = null;
+                gameInit();
+            }
+    );
+}
+
+function gameInit() {
+    layer = new LSprite();
+    addChild(layer);
+    var bmd = new LBitmapData("#AAAAAA", 0, 0, width, height);
+    var bm = new LBitmap(bmd);
+    layer.addChild(bm);
+
+    for (var k in datalist) {
+        imageDatas[k] = new LBitmapData(datalist[k]);
+    }
+
+    mainScene = new MainScene();
+    layer.addChild(mainScene);
+
+    var timestamp = new Date().getTime();
+    layer.addEventListener(LEvent.ENTER_FRAME, function (e) {
+        var timestamp1 = new Date().getTime();
+        //console.log(timestamp1 - timestamp);
+        timestamp = timestamp1;
+    });
+
+//    var fps = new FPS();
+//    layer.addChild(fps);
+}
+
+function MainScene() {
+    base(this, LSprite, []);
+    var s = this;
+    var startCoclor = new normalColor(255, 255, 255);
+    var coloc = utils.getDiffColor(3, startCoclor, false);
+    s.graphics.drawRect(1, coloc[0], [0, 0, width, height], true, coloc[0]);
+
+    function runCicle(c) {
+        c.die();
+        c.alpha = 0;
+        c.x = Math.random() * (width - c.width);
+        c.y = Math.random() * (height - c.height);
+        startCoclor.setRGB(Math.floor(Math.random() * 256), Math.floor(Math.random() * 256), Math.floor(Math.random() * 256));
+        c.changeColor(startCoclor.get16int());
+        LTweenLite.to(c, 0.5, {
+            alpha: 0.7,
+            delay: 0.1 + 1.0 * Math.random()
+        }).to(c, 0.5, {
+            alpha: 0,
+            delay: 0.5 + 1.0 * Math.random(),
+            onComplete: function (e) {
+                runCicle(c);
+            }
+        });
+    }
+
+    for (var i = 0; i < 15; i++) {
+        startCoclor.setRGB(Math.floor(Math.random() * 256), Math.floor(Math.random() * 256), Math.floor(Math.random() * 256));
+        var tempcicle = new DrawCicle(cr, startCoclor.get16int());
+        s.addChild(tempcicle);
+        //utils.writeObj(tempcicle);
+        runCicle(tempcicle);
+    }
+
+    var title = new LBitmap(imageDatas["game_title"]);
+    title.y = height * 0.2;
+    title.x = (width - title.width) / 2;
+    s.addChild(title);
+
+    var startGame = new LSprite();
+    s.addChild(startGame);
+    var img = new LBitmap(imageDatas["start"]);
+    startGame.addChild(img);
+    startGame.width = img.width;
+    startGame.height = img.height;
+    startGame.y = height * 0.7;
+    startGame.x = (width - startGame.width) / 2;
+    //utils.writeObj(startGame);
+
+    startGame.addEventListener(LMouseEvent.MOUSE_DOWN, function (e) {
+        //utils.writeObj(e);
+        startGame.removeAllEventListener();
+        layer.removeChild(mainScene);
+        mainScene = null;
+        gameScene = new GameScene();
+        layer.addChild(gameScene);
+    })
+    return s;
+}
+function GameScene() {
+    base(this, LSprite, []);
+    var s = this;
+    var startCoclor = new normalColor(255, 255, 255);
+    s._currentColors = [];
+    s._currentIndex = [];
+    s._currentColorSize = 3;
+    s._stage = 0;
+    s._currentSize = 3;
+    s._currentOtherSizeCount = 1;
+    s.resetWithStage = function (isRandom) {
+        startCoclor.setRGB(255, 255, 255);
+        if (!isRandom) {
+            startColor = utils.rgbf16(s._currentColors[s._currentIndex[0]]);
+        }
+        s._currentColorSize = Math.floor(s._stage / 23) + 3;
+        if (s._currentColorSize > 10) {
+            s._currentColorSize = 10;
+        }
+        s._currentSize = (s._stage % 23) + 3;
+        s._currentOtherSizeCount = 1 + Math.floor(Math.floor(s._currentSize * 0.5) * Math.random());
+        s._currentColors = utils.getDiffColor(s._currentColorSize, startCoclor, isRandom);
+    }
+    s.resetWithStage(true);
+    constant.reset();
+    s.graphics.drawRect(1, s._currentColors[0], [0, 0, width, height], true, s._currentColors[0]);
+    s.bg = new LSprite();
+    s.addChild(s.bg);
+    s.bg.visible = false;
+    var DisP = width / 5.0;
+    var startPX = 0.5 * width - 2.0 * DisP;
+    var startPY = 0.55 * height - 2.0 * DisP;
+    s._allBalls = [];
+    s._actionBalls = [];
+    s._ballsIndex = [];
+    s._isCanAction = false;
+    s._isStart = false;
+    s._preTween = [];
+    s._tips = null;
+    s._tipsTween = null;
+    s._isEndReady = false;
+    for (var i = 0; i < 25; i++) {
+        var ball = new DrawCicle(cr, s._currentColors[1]);
+        ball.addEventListener(LMouseEvent.MOUSE_DOWN, function (e) {
+            if (!s._isCanAction) {
+                return;
+            }
+            if (!s._isStart) {
+                s._isStart = true;
+                if (s._tips != null) {
+                    if (s._tipsTween != null) {
+                        LTweenLite.remove(s._tipsTween);
+                        s._tipsTween = null;
+                    }
+                    s._tips.die();
+                    s.removeChild(s._tips);
+                    s._tips = null;
+                }
+            }
+            var index1 = s._ballsIndex[e.currentTarget.objectIndex];
+            var ball1 = s._allBalls[index1];
+            var tw = s._preTween[index1];
+            if (tw != null) {
+                LTweenLite.remove(tw);
+            }
+            var index = ball1.colorIndex;
+            //console.log(index);
+            var ci = s._currentIndex[index];
+            if (ci < s._currentColorSize - 1) {
+                ci++;
+            } else {
+                ci = 1;
+            }
+            s._currentIndex[index] = ci;
+            ball1.changeColor(s._currentColors[ci]);
+            //           ball1.changeColor(s._currentColors[1]);
+            ball1.scaleX = 1;
+            ball1.scaleY = 1;
+            ball1.x = startPX + DisP * (index1 % 5) - cr / 2;
+            ball1.y = startPY + DisP * Math.floor(index1 / 5) - cr / 2;
+            tw = LTweenLite.to(ball1, 0.2, {
+                scaleX: 0.8,
+                scaleY: 0.8,
+                x: startPX + DisP * (index1 % 5) - 0.8 * cr / 2,
+                y: startPY + DisP * Math.floor(index1 / 5) - 0.8 * cr / 2,
+                ease: LEasing.Sine.easeOut
+            }).to(ball1, 0.3, {
+                scaleX: 1.1,
+                scaleY: 1.1,
+                x: startPX + DisP * (index1 % 5) - 1.1 * cr / 2,
+                y: startPY + DisP * Math.floor(index1 / 5) - 1.1 * cr / 2,
+                ease: LEasing.Sine.easeInOut
+            }).to(ball1, 0.1, {
+                scaleX: 1,
+                scaleY: 1,
+                x: startPX + DisP * (index1 % 5) - cr / 2,
+                y: startPY + DisP * Math.floor(index1 / 5) - cr / 2,
+                ease: LEasing.Sine.easeIn
+            });
+            s._preTween[index1] = tw;
+            constant.addTime(constant.CLICK_ADD_TIME);
+            s._score.text = constant.addScore(1);
+            s._score.x = (width - s._score.getWidth()) / 2;
+            s.checkAllColor();
+        });
+        ball.x = startPX + DisP * (i % 5) - cr / 2;
+        ball.y = startPY + DisP * Math.floor(i / 5) - cr / 2;
+        s.addChild(ball, i);
+
+        s._allBalls[i] = ball;
+        s._ballsIndex[ball.objectIndex] = i;
+        s._preTween[i] = null;
+    }
+
+    var leftHight = startPY - cr / 2 - 10;
+    var lc = new LBitmap(new LBitmapData("#ffffff", 0, 0, width, leftHight));
+    lc.alpha = 0.78;
+    s.addChild(lc);
+
+    s._flagBalls = [];
+    s.fbs = 0.6;
+    for (var i = 0; i < 10; i++) {
+        var ball = new DrawCicle(cr, s._currentColors[1]);
+        ball.x = (width - cr * s.fbs) / 2;
+        ball.y = leftHight / 6 - cr * s.fbs / 2;
+        ball.scaleX = s.fbs;
+        ball.scaleY = s.fbs;
+        s.addChild(ball);
+        s._flagBalls[i] = ball;
+    }
+
+    s._timeProgress = new ProgressSprite();
+    s._timeProgress.setPosition(width / 2, leftHight / 2);
+    s.addChild(s._timeProgress);
+    s._timeProgress.setPercent(0.5);
+
+    s._score = new LTextField();
+    s._score.color = "#000000";
+    s._score.font = "微软雅黑";
+    s._score.size = 40;
+    s._score.weight = "bolder";
+    s._score.text = "0";
+    s.addChild(s._score);
+    s._score.x = (width - s._score.getWidth()) / 2;
+    s._score.y = 5 * leftHight / 6 - s._score.getHeight()/2;
+
+    var overHeight = height - leftHight;
+    s.overlayer = new LSprite();
+    s.overlayer.y = leftHight;
+    s.addChild(s.overlayer);
+    s.overlayer.visible = false;
+    var olc = new LBitmap(new LBitmapData("#ffffff", 0, 0, width, overHeight));
+    olc.alpha = 0.78;
+    s.overlayer.addChild(olc);
+
+//    var tempData = new LBitmapData(datalist["bestscore"], 0, 0, s.pw, s.ph, LBitmapData.DATA_CANVAS);
+//    tempData.colorTransform(new LRectangle(0, 0, tempData.getWidth(), tempData.getHeight()),
+//            new LColorTransform(0, 0, 0, 1, 0, 0, 0, 0));
+    var bestScoreTitle = new LBitmap(imageDatas["bestscore"]);
+    bestScoreTitle.y = overHeight * 0.2 - bestScoreTitle.getHeight() / 2;
+    bestScoreTitle.x = (width - bestScoreTitle.getWidth()) / 2;
+    s.overlayer.addChild(bestScoreTitle);
+
+    s._bestScore = new LTextField();
+    s._bestScore.color = "#000000";
+    s._bestScore.font = "微软雅黑";
+    s._bestScore.size = 40;
+    s._bestScore.weight = "bolder";
+    s._bestScore.y = overHeight * 0.3 - s._bestScore.getHeight() / 2;
+    s._bestScore.text = "0";
+    s.overlayer.addChild(s._bestScore);
+    s._bestScore.x = (width - s._bestScore.getWidth()) / 2;
+
+    var restart = new LSprite();
+    var rsi = new LBitmap(imageDatas["restart"]);
+    restart.addChild(rsi);
+    restart.width = rsi.getWidth();
+    restart.height = rsi.getHeight();
+    restart.x = (width - restart.getWidth()) / 2;
+    restart.y = overHeight * 0.5 - restart.getHeight() / 2;
+    s.overlayer.addChild(restart);
+    restart.addEventListener(LMouseEvent.MOUSE_DOWN, function (e) {
+        if (s._isEndReady) {
+            LTweenLite.to(s.overlayer, 0.6, {
+                y: height,
+                ease: LEasing.Sine.easeIn,
+                onComplete: function (e) {
+                    s.restartGame();
+                    s.overlayer.visible = false;
+                }
+            });
+        }
+    });
+
+    var share = new LSprite();
+    var si = new LBitmap(imageDatas["share"]);
+    share.addChild(si);
+    share.width = si.getWidth();
+    share.height = si.getHeight();
+    share.x = (width - share.getWidth()) / 2;
+    share.y = overHeight * 0.7 - share.getHeight() / 2;
+    s.overlayer.addChild(share);
+    share.addEventListener(LMouseEvent.MOUSE_DOWN, function (e) {
+        if (typeof WeixinJSBridge == "undefined") {
+            alert("请在微信中打开游戏！");
+        } else {
+            WeixinJSBridge.invoke('shareTimeline', {
+                "title": "颜色战争",
+                "link": "http://runforone.github.io/",
+                "desc": "我获得了" + constant.getBestScore() + "分！！你呢？"
+            });
+        }
+    });
+    s.resetStage = function () {
+        var allIndex = [];
+        var count = s._allBalls.length;
+        //LTweenLite.removeAll();
+        for (var i = 0; i < count; i++) {
+            s._allBalls[i].visible = false;
+            allIndex.push(i);
+        }
+        s._actionBalls.splice(0, s._actionBalls.length);
+        s._currentIndex.splice(0, s._currentIndex.length);
+        for (var i = 0; i < s._currentSize; i++) {
+            var leftIndex = allIndex.length;
+            var nowIndex = Math.floor(Math.random() * leftIndex);
+            s._actionBalls.push(allIndex[nowIndex]);
+            allIndex.splice(nowIndex, 1);
+            if (i < s._currentOtherSizeCount) {
+                var dc = s._currentColorSize - 2;
+                var otherIndex = Math.floor(Math.random() * dc);
+                s._currentIndex.push(2 + otherIndex);
+            } else {
+                s._currentIndex.push(1);
+            }
+        }
+        for (var i = 0; i < s._currentSize; i++) {
+            var ind = s._actionBalls[i];
+            var ball1 = s._allBalls[ind];
+            ball1.changeColor(s._currentColors[s._currentIndex[i]]);
+            ball1.scaleX = 0;
+            ball1.scaleY = 0;
+            ball1.x = startPX + DisP * (ind % 5);
+            ball1.y = startPY + DisP * Math.floor(ind / 5);
+            ball1.visible = true;
+            ball1.colorIndex = i;
+            LTweenLite.to(ball1, 0.7, {
+                scaleX: 1,
+                scaleY: 1,
+                x: startPX + DisP * (ind % 5) - cr / 2,
+                y: startPY + DisP * Math.floor(ind / 5) - cr / 2,
+                ease: LEasing.Back.easeOut
+            });
+            if (i == 0 && s._stage == 0 && constant.isNeedTips) {
+                startCoclor = utils.rgbf16(s._currentColors[1]);
+//                tempData = new LBitmapData(datalist["points"], 0, 0, s.pw, s.ph, LBitmapData.DATA_CANVAS);
+//                tempData.colorTransform(new LRectangle(0, 0, tempData.getWidth(), tempData.getHeight()),
+//                        new LColorTransform(startCoclor.r / 255.0, startCoclor.g / 255.0, startCoclor.b / 255.0, 1, 0, 0, 0, 0));
+                s._tips = new LBitmap(imageDatas["points"]);
+                s.addChild(s._tips);
+                s._tips.x = ball1.x - s._tips.getWidth() / 2;
+                s._tips.y = ball1.y;
+                s._tipsTween = LTweenLite.to(s._tips, 0.5, {
+                    y: ball1.y + 30,
+                    loop: true,
+                    ease: LEasing.Sine.easeInOut
+                }).to(s._tips, 0.5, {
+                    y: ball1.y,
+                    ease: LEasing.Sine.easeInOut
+                });
+                constant.isNeedTips = false;
+            }
+        }
+        LTweenLite.to(s, 0.5, {onComplete: function (e) {
+            s.moveEnd();
+        }});
+
+        var flagCount = s._flagBalls.length;
+        var dis = s.fbs * cr * 1.2;
+        var startX = width / 2.0 - dis * (s._currentColorSize / 2.0 - 1) - s.fbs * cr / 2;
+        for (var i = 0; i < flagCount; i++) {
+            var ball1 = s._flagBalls[i];
+            if (i < s._currentColorSize - 1) {
+                ball1.visible = true;
+                ball1.x = startX + i * dis;
+                ball1.changeColor(s._currentColors[i + 1]);
+            } else {
+                ball1.visible = false;
+            }
+        }
+    }
+    s.moveEnd = function () {
+        s._isCanAction = true;
+    }
+    s.resetStage();
+    s.checkAllColor = function () {
+        var isClear = true;
+        var nowC = s._currentIndex[0];
+        for (var i = 1; i < s._currentSize; i++) {
+            if (nowC != s._currentIndex[i]) {
+                isClear = false;
+                break;
+            }
+        }
+        //console.log(isClear);
+
+        if (isClear) {
+            s._score.text = constant.addScore((s._currentSize - 2) * 10 * (s._currentColorSize - 2));
+            s._score.x = (width - s._score.getWidth()) / 2;
+            s._stage++;
+            var nowcolor = s._currentColors[nowC];
+            s.resetWithStage(false);
+
+            s.bg.graphics.clear();
+            s.bg.graphics.drawRect(0, nowcolor, [0, 0, width, height], true, nowcolor);
+            s.bg.alpha = 0;
+            s.bg.visible = true;
+            LTweenLite.to(s.bg, 0.5, {
+                alpha: 1,
+                onComplete: function (e) {
+                    s.graphics.clear();
+                    s.graphics.drawRect(0, nowcolor, [0, 0, width, height], true, nowcolor);
+                    s.bg.visible = false;
+                    s.resetStage();
+                }
+            });
+            s._isCanAction = false;
+
+            constant.addTime(constant.LEVEL_ADD_TIME);
+            s._timeProgress.progressTo(constant.getTimePercent(), 0.6);
+        }
+    }
+    s.restartGame = function () {
+        s._stage = 0;
+        s.resetWithStage();
+        constant.reset();
+        s.resetStage();
+        s._score.text = "0";
+        s._score.x = (width - s._score.getWidth()) / 2;
+        s._timeProgress.progressTo(constant.getTimePercent(), 0.7);
+    }
+    s.lastTime = new Date().getTime();
+    s.addEventListener(LEvent.ENTER_FRAME, function () {
+        var nowT = new Date().getTime();
+        var dt = (nowT - s.lastTime) / 1000.0;
+        if (s._isStart) {
+            if (s._isCanAction) {
+                var isContiune = constant.passTime(dt);
+                s._timeProgress.setPercent(constant.getTimePercent());
+                if (!isContiune) {
+                    s._isEndReady = false;
+                    constant.gameover();
+                    s._isStart = false;
+                    s._isCanAction = false;
+                    s._bestScore.text = constant.getBestScore();
+                    s._bestScore.x = (width - s._bestScore.getWidth()) / 2;
+                    s.overlayer.y = height;
+                    s.overlayer.visible = true;
+                    LTweenLite.to(s.overlayer, 0.6, {
+                        y: leftHight,
+                        ease: LEasing.Sine.easeOut,
+                        onComplete: function (e) {
+                            s._isEndReady = true;
+                        }
+                    });
+                }
+            }
+        }
+        s.lastTime = nowT;
+    });
+    return s;
+}
+function ProgressSprite() {
+    base(this, LSprite, []);
+    var s = this;
+    var bg = new LBitmap(imageDatas["timebarbg"]);
+    bg.x = -1;
+    bg.y = -1;
+    s.addChild(bg);
+    s.pw = 300;
+    s.ph = 40;
+//    var tempData = new LBitmapData(datalist["timebar"], 0, 0, s.pw, s.ph, LBitmapData.DATA_CANVAS);
+    //tempData.dataType = LBitmapData.DATA_CANVAS;
+//    tempData.colorTransform(new LRectangle(0, 0, s.pw, s.ph),
+//            new LColorTransform(0.78, 0.23, 0.17, 1, 0, 0, 0, 0));
+    var top = new LBitmap(imageDatas["timebar"]);
+    s.addChild(top);
+
+    s.ps = new LSprite();
+    s.ps.graphics.drawRect(0, "#ffffff", [0, 0, s.pw, s.ph]);
+    top.mask = s.ps;
+    s.ps.x = -100;
+    s.setPosition = function (x, y) {
+        s.x = x - s.pw / 2;
+        s.y = y - s.ph / 2;
+    }
+    s.getPercent = function () {
+        var p = (s.pw + s.ps.x) / s.pw;
+        if (p < 0) {
+            p = 0;
+        } else if (p > 1) {
+            p = 1;
+        }
+    }
+    s.tween = null;
+    s.setPercent = function (p) {
+        if (s.tween != null) {
+            LTweenLite.remove(s.tween);
+            s.tween = null;
+        }
+        if (p < 0) {
+            p = 0;
+        } else if (p > 1) {
+            p = 1;
+        }
+        s.ps.x = (p - 1) * s.pw;
+    }
+    s.progressTo = function (p, t) {
+        if (s.tween != null) {
+            LTweenLite.remove(s.tween);
+            s.tween = null;
+        }
+        if (p < 0) {
+            p = 0;
+        } else if (p > 1) {
+            p = 1;
+        }
+        s.tween = LTweenLite.to(s.ps, t, {
+            x: (p - 1) * s.pw,
+            ease: LEasing.Sine.easeOut
+        });
+    }
+    return s;
+}
+function DrawCicle(r, c) {
+    base(this, LSprite, []);
+    var s = this;
+    s.width = r;
+    s.height = r;
+    s.graphics.drawArc(1, c, [r / 2, r / 2, r / 2, 0, 2 * Math.PI], true, c);
+    s.changeColor = function (c1) {
+        s.graphics.clear();
+        s.graphics.drawArc(1, c1, [s.width / 2, s.width / 2, s.width / 2, 0, 2 * Math.PI], true, c1);
+    }
+    s.colorIndex = 0;
+    return s;
+}
+function normalColor(r0, g0, b0) {
+    var s = new Object();
+    s.r = r0;
+    s.g = g0;
+    s.b = b0;
+
+    s.setRGB = function (r1, g1, b1) {
+        this.r = r1;
+        this.g = g1;
+        this.b = b1;
+    }
+
+    s.get16int = function () {
+        return "#" + this.r.toString(16) + this.g.toString(16) + this.b.toString(16);
+    }
+    return s;
+}
+function Constant() {
+    var s = new Object();
+    s._bestScore = 0;
+    s._currentTime = 0;
+    s._currentScore = 0;
+    s.T_MAX_TIME = 10.0;
+    s.CLICK_ADD_TIME = 0.1;
+    s.LEVEL_ADD_TIME = 1.0;
+    s.T_START_TIM = 5.0;
+    s.isNeedTips = true;
+    s.reset = function () {
+        this._currentTime = s.T_START_TIM;
+        this._currentScore = -5;
+    }
+    s.getScore = function () {
+        return (this._currentScore + 5) / 3;
+    }
+    s.addScore = function (score) {
+        this._currentScore += score * 3;
+        return this.getScore();
+    }
+    s.getBestScore = function () {
+        return (this._bestScore + 3) / 5;
+    }
+    s.passTime = function (dt) {
+        this._currentTime -= dt;
+        if (this._currentTime < 0.0001) {
+            this._currentTime = 0;
+            return false;
+        }
+        return true;
+    }
+
+    s.getTimePercent = function () {
+        return this._currentTime / s.T_MAX_TIME;
+    }
+
+    s.addTime = function (dt) {
+        this._currentTime += dt;
+        if (this._currentTime >= s.T_MAX_TIME) {
+            this._currentTime = s.T_MAX_TIME;
+        }
+        return this.getTimePercent();
+    }
+
+    s.gameover = function () {
+        if (this.getBestScore() < this.getScore()) {
+            this._bestScore = this.getScore() * 5 - 3;
+        }
+    }
+    return s;
+}
+function Utils() {
+    var s = new Object();
+    s.writeObj = function (obj) {
+        var description = "";
+        for (var i in obj) {
+            var property = obj[i];
+            description += i + " = " + property + "\n";
+        }
+        console.warn(description);
+    }
+
+    s._diffColorDis = [3.0 / 11.0, 5.0 / 11.0, 7.0 / 11.0, 9.0 / 11.0];
+
+    s.getDiffColor = function (size, color, isRandom) {
+        var re = [];
+        var start = 0;
+        if (size > 0) {
+            var nc = color;
+            if (isRandom) {
+                nc.setRGB(Math.floor(Math.random() * 256), Math.floor(Math.random() * 256), Math.floor(Math.random() * 256));
+            }
+            re[start] = nc.get16int();
+            start++;
+            var diff3 = [
+                Math.floor(this._diffColorDis[Math.floor(Math.random() * 4)] * 256),
+                Math.floor(this._diffColorDis[Math.floor(Math.random() * 4)] * 256),
+                Math.floor(this._diffColorDis[Math.floor(Math.random() * 4)] * 256)
+            ];
+            var nowC = nc;
+            while (start < size) {
+                nowC.setRGB(
+                                (nowC.r + diff3[0]) % 256,
+                                (nowC.g + diff3[1]) % 256,
+                                (nowC.b + diff3[2]) % 256
+                );
+                re[start] = nowC.get16int();
+                start++;
+            }
+        }
+        return re;
+    }
+    s.rgbf16 = function (color) {
+        var sColor = color.toLowerCase();
+        if (sColor.length === 4) {
+            var sColorNew = "#";
+            for (var i = 1; i < 4; i += 1) {
+                sColorNew += sColor.slice(i, i + 1).concat(sColor.slice(i, i + 1));
+            }
+            sColor = sColorNew;
+        }
+        //处理六位的颜色值
+        var sColorChange = [];
+        for (var i = 1; i < 7; i += 2) {
+            sColorChange.push(parseInt("0x" + sColor.slice(i, i + 2)));
+        }
+        return new normalColor(sColorChange[0], sColorChange[1], sColorChange[2]);
+    };
+    return s;
+}
+</script>
+</body>
+</html>  
